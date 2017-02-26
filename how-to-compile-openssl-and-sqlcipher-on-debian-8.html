@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="title" content="How to compile OpenSSl and SQLCipher on Debian 8">
+  <meta name="description" content="How to compile OpenSSl and SQLCipher on Debian 8">
+  <meta name="keywords" content="OpenSSL SQLCipher compile compiling SQLite encrypted database">
+  <meta name="author" content="Alexander Hebert">
+  
+  <title>How to compile OpenSSl and SQLCipher on Debian 8</title>
+  
+  <script src="bower_components/jquery/dist/jquery.min.js"></script>
+  
+  <link rel="stylesheet" href="css/bootswatch.css">
+  <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+  
+  <link rel="stylesheet" href="css/style.css">
+
+</head>
+<body>
+
+
+
+    <!-- Static navbar -->
+    <nav class="navbar navbar-inverse navbar-static-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="/"> </a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav txt-nav">
+            <li><a href="/about.html">About</a></li>
+            <li><a href="/contact.html">Contact</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-md-12 docs">
+        <h1>How to Compile OpenSSl and SQLCipher on Debian 8</h1>
+          <p class="text">Posted on Apr. 28, 2016<br>By Alex Hebert<br><br></p>
+          <p class="text">OpenSSL is a trusted open source crypto library. SQLCipher uses OpenSSL to implement encryption in SQLite databases. If you want to compile them manually, this article should save you some time. These steps were tested on Debian 8.</p>
+          
+          <p class="text">To start, check for and install the following packages if they are not already present. The tcl package is optional but highly recommended to run the tests after compiling.</p>
+          <pre class="text"><code>apt-get install build-essentials
+apt-get install g++-multilib
+apt-get install tcl-dev
+apt-get install git</code></pre>
+          
+          <p class="text">I also had to install xutils-dev (for <code>makedepend</code>):</p>
+          <pre class="text"><code>apt-get install xutils-dev</code></pre>
+        
+        <h2 id="openssl">OpenSSL</h2>
+          
+          <p class="text">To compile OpenSSL manually, first get the source code.</p>
+          <pre class="text">wget https://www.openssl.org/source/openssl-1.0.2-latest.tar.gz<code></code></pre>
+          <p class="text">It's a good idea to check the SHA-256 hash using <code>sha256sum</code> before proceeding.</p>
+          <pre class="text"><code>tar -zxf openssl-1.0.2-latest.tar.gz
+cd openssl-1.0.2-latest</code></pre>
+          <p class="text">Next, run <code>config</code>. The reason for the -fPIC and no-shared options will be explained below.</p>
+          <pre class="text"><code>./config -fPIC no-shared</code></pre>
+          <p class="text">If you are requested to run <code>make depend</code>, I recommend doing so because for me running <code>make</code> without <code>make depend</code> failed to compile.</p>
+          <pre class="text"><code>make depend
+make
+make test > ~/openssl-test-results</code></pre>
+          <p class="text">OpenSSL's test results are very long. There is one line near the end that hopefully says "All tests passed" so look for that. Last, run the install if you want to. If you have another version of OpenSSl installed from e.g. a package, you might consider removing it; then ensure your <code>PATH</code> will find the new version.</p>
+          <pre class="text"><code>make install
+# Check version
+openssl version</code></pre>
+          <p class="text">You have compiled OpenSSL successfully.</p>
+          
+        <h2 id="sqlcipher">SQLCipher</h2>
+
+          <p class="text">If you just want to compile SQLCipher, it makes sense to use <code>libcrypto.a</code> from a pre-compiled package. On Debian, you can install <code>libcrypto.a</code> with the libssl-dev package:</p>
+          <pre class="text"><code>sudo apt-get install openssl
+sudo apt-get install libssl-dev</code></pre>
+          
+          <p class="text">However, if you follow the instructions for "Compiling with static linking" on
+            <a href="https://www.zetetic.net/sqlcipher/introduction/">Zetetic's website</a> (at the time this was published), you will probably run into a problem when attempting to compile the source. Note: <code>/usr/lib/x86_64-linux-gnu/libcrypto.a</code> is the default path from libssl-dev.</p>
+          
+          <pre class="text"><code>git clone https://github.com/sqlcipher/sqlcipher.git
+cd sqlcipher
+./configure --enable-tempstore=yes CFLAGS="-DSQLITE_HAS_CODEC" LDFLAGS="/usr/lib/x86_64-linux-gnu/libcrypto.a"</code></pre>
+          
+          <p class="text">Up to this point, there should be no issues. <a href="/sqlcipher-configure-output1.txt">Example output</a></p>
+          
+          <p class="text">But then run <b>make</b></p>
+          <pre class="text"><code>make</code></pre>
+          
+          <p class="text">Most likely there will be a lot of output from make, ending with a nasty error that the job failed:</p>
+          <pre class="text"><samp>*** Warning: Linking the shared library libsqlcipher.la against the
+*** static library /usr/lib/x86_64-linux-gnu/libcrypto.a is not portable!
+libtool: link: gcc -shared  -fPIC -DPIC  .libs/sqlite3.o   /usr/lib/x86_64-linux-gnu/libcrypto.a -ldl -lcrypto -lpthread    -Wl,-soname -Wl,libsqlcipher.so.0 -o .libs/libsqlcipher.so.0.8.6
+/usr/bin/ld: /usr/lib/x86_64-linux-gnu/libcrypto.a(obj_dat.o): relocation R_X86_64_32S against `.rodata' can not be used when making a shared object; recompile with -fPIC
+/usr/lib/x86_64-linux-gnu/libcrypto.a: error adding symbols: Bad value
+collect2: error: ld returned 1 exit status
+Makefile:589: recipe for target 'libsqlcipher.la' failed
+make: *** [libsqlcipher.la] Error 1</samp></pre>
+          
+          <p class="text">Why does that happen? The gcc compiler gives the reason: libcrypto.a was not compiled with the -fPIC option. Why should PIC machine code be necessary for linking a static library? PIC code is not necessary for linking a static library. Look back at the <a href="/sqlcipher-configure-output1.txt">output from SQLCipher configure.</a></p>
+          <pre class="text"><samp>checking whether to build shared libraries... yes
+checking whether to build static libraries... yes</samp></pre>
+          
+          <p class="text">The default options for configure are set to build both shared and static libraries. It would be nice if Zetetic would make a small correction to their instructions, specifying to compile libcrypto.a with the -fPIC option or run configure with this option: <code>--disable-shared</code></p>
+          <pre class="text"><code>make distclean
+./configure --disable-shared --enable-static=yes --enable-tempstore=yes CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_ENABLE_FTS3" LDFLAGS="/usr/lib/x86_64-linux-gnu/libcrypto.a"</code></pre>
+          <pre class="text"><samp>checking whether to build shared libraries... no
+checking whether to build static libraries... yes</samp></pre>
+          <pre class="text"><code>make</code></pre>
+          <pre class="text"><samp>*** Warning: Linking the shared library libtclsqlite3.la against the
+*** static library /usr/lib/x86_64-linux-gnu/libcrypto.a is not portable!
+libtool: link: ar cru .libs/libtclsqlite3.a /usr/lib/x86_64-linux-gnu/libcrypto.a  tclsqlite.o
+ar: `u' modifier ignored since `D' is the default (see `U')
+libtool: link: ranlib .libs/libtclsqlite3.a
+libtool: link: ( cd ".libs" && rm -f "libtclsqlite3.la" && ln -s "../libtclsqlite3.la" "libtclsqlite3.la" )</samp></pre>
+          
+          <p class="text">Make should finish compiling now, and I think  it's OK to ignore warning from gcc. If instead you are building SQLCipher with the manually compiled OpenSSL from above, then the steps are the same except change the file path for libcrypto.a</p>
+          <pre class="text"><code>git clone https://github.com/sqlcipher/sqlcipher.git
+cd sqlcipher
+./configure --disable-shared --enable-static=yes --enable-tempstore=yes CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_ENABLE_FTS3" LDFLAGS="/PATH/to/openssl-1.0.2-latest/libcrypto.a"</code></pre>
+
+          <p class="text">Before running <code>make</code>, I prefer to change one line in the <code>makefile</code>. The default should be OK, but I want option 3 "to force temporary tables to always be in memory."</p>
+          <pre class="text"><code>...
+# Flags controlling use of the in memory btree implementation
+#
+# SQLITE_TEMP_STORE is 0 to force temporary tables to be in a file, 1 to
+# default to file, 2 to default to memory, and 3 to force temporary
+# tables to always be in memory.
+#
+TEMP_STORE = -DSQLITE_TEMP_STORE=3
+...</code></pre>
+
+          <p class="text">After running <code>make</code>, I had assumed running <code>make test</code> is the same as most other build processes. However, if you try it, <code>make test</code>, will fail.</p>
+          <pre class="text"><code>make
+make test</code></pre>
+          <p class="text">Why does <code>make test</code> fail? I refer to <a href="https://groups.google.com/forum/#!topic/sqlcipher/kI--PVwPQ3o">Nick Parker's answer</a>:</p>
+          
+          <blockquote class="text">SQLCipher is not meant to run the entire SQLite test suite as it covers features that may be in conflict with the codec enabled for SQLCipher.  That said, you can compile the testfixture binary and run the specific crypto tests using the following:
+          </blockquote>
+          <pre class="text"><code>make testfixture
+./testfixture test/crypto.test</code></pre>
+          
+          <p class="text">However to pass all the crypto tests, you have to run configure and make with <a href="https://groups.google.com/forum/#!topic/sqlcipher/kI--PVwPQ3o">the CFLAGS option to enable full text search</a>:</p>
+          <blockquote class="text">Glad to hear it is working for you.  As a note, you can include that when you run ./configure in the CFLAGS, (i.e., <code>CFLAGS="-DSQLITE_HAS_CODEC <b>-DSQLITE_ENABLE_FTS3</b>"</code>)
+          </blockquote>
+          <p class="text">The CFLAGS option <code>-DSQLITE_ENABLE_FTS3</code> was included in the configure code above. Look over the test results, and all tests should pass. If you recompile SQLCipher, remember to run <code>make distclean</code> first to clear the old files. Congrats, you have successfully compiled the command line version of SQLCipher.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="container-fluid">
+    <footer class="footer">
+      <p class="txt-footer">&copy; 2016 Alexander Hebert</p>
+    </footer>
+  </div>
+
+</body>
+</html>

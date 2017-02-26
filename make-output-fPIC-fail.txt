@@ -1,0 +1,8 @@
+*** Warning: Linking the shared library libsqlcipher.la against the
+*** static library /usr/lib/x86_64-linux-gnu/libcrypto.a is not portable!
+libtool: link: gcc -shared  -fPIC -DPIC  .libs/sqlite3.o   /usr/lib/x86_64-linux-gnu/libcrypto.a -ldl -lcrypto -lpthread    -Wl,-soname -Wl,libsqlcipher.so.0 -o .libs/libsqlcipher.so.0.8.6
+/usr/bin/ld: /usr/lib/x86_64-linux-gnu/libcrypto.a(obj_dat.o): relocation R_X86_64_32S against `.rodata' can not be used when making a shared object; recompile with -fPIC
+/usr/lib/x86_64-linux-gnu/libcrypto.a: error adding symbols: Bad value
+collect2: error: ld returned 1 exit status
+Makefile:589: recipe for target 'libsqlcipher.la' failed
+make: *** [libsqlcipher.la] Error 1
